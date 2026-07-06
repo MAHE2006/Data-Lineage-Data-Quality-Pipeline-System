@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Generated pipeline outputs (these are recreated by running main.py)
+data/raw/*.csv
+data/staging/*.csv
+data/processed/*.db
+reports/*.csv
+metadata/lineage_log.json
+
+# OS / editor
+.DS_Store
+.vscode/

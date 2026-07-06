@@ -1,0 +1,25 @@
+table,column,data_type,description,source_stage,transformation_applied,pii
+raw_orders,order_id,int,Unique order line identifier,raw ingestion,none,no
+raw_orders,customer_id,int,Unique customer identifier,raw ingestion,none,no
+raw_orders,customer_email,string,Customer contact email,raw ingestion,validated as regex + nulls dropped in 02_validate,yes
+raw_orders,product_id,int,Unique product identifier,raw ingestion,none,no
+raw_orders,product_category,string,Product category label,raw ingestion,nulls filled with 'Unknown'; casing standardized to Title Case in 02_validate,no
+raw_orders,quantity,int,Units purchased in the order line,raw ingestion,rows with quantity<=0 dropped in 02_validate,no
+raw_orders,unit_price,float,Price per unit at time of order,raw ingestion,nulls imputed with per-product median; rows with price<=0 dropped in 02_validate,no
+raw_orders,order_date,string,Date the order was placed,raw ingestion,mixed formats normalized during ingestion/BI load,no
+raw_orders,region,string,Sales region,raw ingestion,nulls filled with 'Unknown',no
+raw_orders,payment_method,string,Payment channel used,raw ingestion,none,no
+raw_orders,total_amount,float,quantity * unit_price,raw ingestion,recomputed after cleaning in 02_validate to stay consistent,no
+validated_orders,*,*,Cleaned version of raw_orders after 02_validate,validation,nulls handled; duplicates removed; business rules enforced,mixed
+dim_customer,customer_id,int,Customer dimension key,03_transform (SQL),aggregated from validated_orders,no
+dim_customer,lifetime_orders,int,Count of distinct orders per customer,03_transform (SQL),SQL aggregation,no
+dim_customer,lifetime_spend,float,Sum of total_amount per customer,03_transform (SQL),SQL aggregation,no
+dim_product,product_id,int,Product dimension key,03_transform (SQL),aggregated from validated_orders,no
+dim_product,avg_unit_price,float,Average unit price observed for the product,03_transform (SQL),SQL aggregation,no
+dim_date,order_date,string,Calendar date grain,03_transform (SQL),derived year/month/day/quarter via SQL strftime,no
+fact_orders,order_id,int,Grain of the fact table = one row per order line,03_transform (SQL),passthrough from validated_orders,no
+fact_orders,total_amount,float,Order line revenue,03_transform (SQL),passthrough,no
+vw_monthly_revenue,total_revenue,float,Revenue aggregated by year/month,04_generate_reports (SQL view),SUM(total_amount) grouped by month,no
+vw_category_performance,revenue,float,Revenue aggregated by product category,04_generate_reports (SQL view),SUM(total_amount) grouped by category,no
+vw_anomalies_amount_mismatch,*,*,Rows where total_amount != quantity*unit_price (should be empty),04_generate_reports (SQL view),data quality safety-net check,no
+vw_anomalies_high_value_orders,*,*,Orders with total_amount > 3x average order value,04_generate_reports (SQL view),outlier detection for anomaly monitoring,no

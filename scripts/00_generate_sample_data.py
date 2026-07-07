@@ -10,11 +10,6 @@ contains the kinds of problems a real dataset has:
     - mixed date formats
     - a few malformed emails
 
-Run this ONLY if you don't have your own CSV yet. If you downloaded a
-real dataset (e.g. Kaggle "Online Retail II"), just drop it into
-data/raw/raw_orders.csv with matching column names, or adjust
-01_ingest.py's COLUMN_MAP.
-
 Output: data/raw/raw_orders.csv
 """
 

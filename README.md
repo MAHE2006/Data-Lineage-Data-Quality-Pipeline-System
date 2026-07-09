@@ -48,37 +48,12 @@ pip install pandas numpy
 ```
 
 ## 2. Get a dataset
-
-You have two options:
-
-**Option A — use the built-in synthetic dataset (no download needed)**
-Just run the pipeline (step 3). `00_generate_sample_data.py` auto-generates
+Just run the pipeline . `00_generate_sample_data.py` auto-generates
 `data/raw/raw_orders.csv` — 5,000+ e-commerce order rows with realistic
 problems baked in on purpose: nulls, duplicate rows, negative quantities,
 mixed date formats, bad emails, inconsistent category casing. This is enough
 to demonstrate every part of the system without needing internet access.
 
-**Option B — use a real Kaggle dataset**
-For a more "real-world" version of this project, use the **Online Retail II**
-dataset (UK-based online retailer, ~1M real transactions, 2009–2011), which
-already contains negative quantities, cancelled orders, missing Customer
-IDs, and duplicate records:
-- https://www.kaggle.com/datasets/mashlyn/online-retail-ii-uci
-- https://archive.ics.uci.edu/dataset/502/online+retail+ii (original UCI source, no Kaggle login needed)
-
-Other good alternatives:
-- Retail Sales & Customer Demographics: https://www.kaggle.com/datasets/mohammadtalib786/retail-sales-dataset
-- Online Retail (single year): https://www.kaggle.com/datasets/tunguz/online-retail
-
-To use a real dataset:
-1. Download the CSV and place it at `data/raw/raw_orders.csv`.
-2. Open `scripts/01_ingest.py` and fill in `COLUMN_MAP` to rename that
-   dataset's columns to: `order_id, customer_id, customer_email,
-   product_id, product_category, quantity, unit_price, order_date, region,
-   payment_method, total_amount` (drop/adapt any that don't apply, and
-   adjust `EXPECTED_SCHEMA` in `02_validate.py` to match).
-3. Skip step 3's data-generation stage (the orchestrator auto-detects an
-   existing raw file and skips it).
 
 ## 3. Run the pipeline
 
@@ -118,7 +93,7 @@ python scripts/04_generate_reports.py
 | `metadata/lineage_log.json` / `reports/lineage_log_flat.csv` | Full data lineage history (every stage, every run) |
 | `metadata/data_dictionary.csv` | Governance catalog: column descriptions, source stage, transformation applied, PII flag |
 
-## 5. Inspect the SQL warehouse directly (optional)
+## 5. Inspect the SQL warehouse directly 
 
 ```bash
 sqlite3 data/processed/warehouse.db
@@ -130,12 +105,12 @@ SELECT * FROM vw_category_performance;
 Or open `data/processed/warehouse.db` with DB Browser for SQLite (free, GUI)
 if you'd rather click around than write queries.
 
-## 6. Build the Power BI dashboard
+## 6. Building the Power BI dashboard
 
 1. Open Power BI Desktop → **Get Data → Text/CSV**, then load each file from
    `reports/` (or use **Get Data → Folder** and point it at the whole
    `reports/` folder to load them all at once).
-2. Suggested visuals:
+2. visuals:
    - **Line chart**: `monthly_revenue.csv` → `order_month` (x-axis) vs
      `total_revenue` (y-axis), split by `order_year`.
    - **Bar chart**: `category_performance.csv` → `product_category` vs

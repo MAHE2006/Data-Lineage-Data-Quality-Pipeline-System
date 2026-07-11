@@ -1,8 +1,11 @@
 # Data Lineage & Data Quality Pipeline System
 
-An end-to-end pipeline that tracks data from raw ingestion through to final
-reporting, with full lineage logging, automated data quality checks, a
-SQL-based transformation layer, and Power BI-ready outputs.
+This is a small end-to-end pipeline I built to understand how data actually
+moves through a real system — from raw ingestion all the way to reporting —
+and how you'd track that movement (lineage) and clean up the mess along the
+way (data quality).
+
+Basic flow:
 
 ```
 raw CSV --> [01_ingest] --> staging CSV --> [02_validate] --> validated CSV
@@ -10,52 +13,60 @@ raw CSV --> [01_ingest] --> staging CSV --> [02_validate] --> validated CSV
     --> [04_generate_reports] --> reports/*.csv --> Power BI
 ```
 
-Every arrow above is logged as a lineage record (source, target, row counts,
-columns touched, transformation applied, timestamp) in
-`metadata/lineage_log.json`.
+Every one of those arrows gets logged — source, target, row counts, which
+columns were touched, what transformation happened, and a timestamp — into
+`metadata/lineage_log.json`. So at any point you can go back and answer
+"where did this number actually come from?"
 
 ## Project structure
 
 ```
 data_lineage_project/
-├── main.py                        # orchestrator — runs the whole pipeline
+├── main.py                        # runs the whole pipeline end to end
 ├── data/
-│   ├── raw/                       # raw source CSV lands here
-│   ├── staging/                   # intermediate ingest/validation outputs
+│   ├── raw/                       # raw source CSV goes here
+│   ├── staging/                   # in-between ingest/validation output
 │   └── processed/                 # warehouse.db (SQLite)
 ├── scripts/
-│   ├── lineage_tracker.py         # reusable lineage logging module
-│   ├── 00_generate_sample_data.py # creates a synthetic messy dataset
+│   ├── lineage_tracker.py         # logging module used by every stage
+│   ├── 00_generate_sample_data.py # builds a messy synthetic dataset
 │   ├── 01_ingest.py               # raw -> staging
-│   ├── 02_validate.py             # data quality checks + cleaning
-│   ├── 03_transform.py            # runs SQL layer, builds star schema
+│   ├── 02_validate.py             # quality checks + cleaning
+│   ├── 03_transform.py            # SQL layer, builds the star schema
 │   └── 04_generate_reports.py     # exports CSVs for Power BI
 ├── sql/
 │   └── transformations.sql        # dimension/fact tables + reporting views
 ├── metadata/
-│   ├── data_dictionary.csv        # governance: column-level catalog
-│   └── lineage_log.json           # generated at runtime
-└── reports/                       # generated at runtime, load into Power BI
+│   ├── data_dictionary.csv        # column-level catalog (governance)
+│   └── lineage_log.json           # generated when you run it
+└── reports/                       # generated when you run it, load into Power BI
 ```
 
 ## 1. Setup
 
-Requires Python 3.9+ with `pandas` and `numpy` (both standard in most
-environments; `sqlite3` ships with Python's standard library).
+You need Python 3.9+ with pandas and numpy. `sqlite3` comes with Python
+already, so no separate install needed there.
 
 ```bash
 pip install pandas numpy
 ```
 
-## 2. Get a dataset
-Just run the pipeline . `00_generate_sample_data.py` auto-generates
-`data/raw/raw_orders.csv` — 5,000+ e-commerce order rows with realistic
-problems baked in on purpose: nulls, duplicate rows, negative quantities,
-mixed date formats, bad emails, inconsistent category casing. This is enough
-to demonstrate every part of the system without needing internet access.
+## 2. Getting a dataset
 
+You don't need to download anything to try this out. Just run the pipeline —
+`00_generate_sample_data.py` will generate `data/raw/raw_orders.csv` for you:
+5,000+ fake e-commerce orders with realistic problems baked in on purpose
+(nulls, duplicate rows, negative quantities, mixed date formats, bad emails,
+inconsistent category casing). That's enough to show every part of the
+system working without needing internet access.
 
-## 3. Run the pipeline
+I originally planned to swap this out for a real dataset (Online Retail II
+from UCI/Kaggle would be the obvious pick — it's got real missing
+CustomerIDs and cancelled orders already), and the ingest script has
+`COLUMN_MAP` set up so that's an easy swap later. Right now it runs on the
+synthetic data.
+
+## 3. Running the pipeline
 
 From the project root:
 
@@ -63,14 +74,15 @@ From the project root:
 python main.py
 ```
 
-This runs all stages in order and prints lineage log lines like:
+This runs everything in order and prints out lineage as it goes:
 
 ```
 [LINEAGE] 02_validate: data/staging/staging_orders.csv -> data/staging/validated_orders.csv | rows 5150 -> 4734 (dropped 416)
 Data Quality Score: 98.09 -> 100.0 (+1.91 points)
 ```
 
-You can also run any stage individually (useful for debugging one step):
+You can also run each stage on its own if you want to debug one piece
+without re-running the whole thing:
 
 ```bash
 python scripts/00_generate_sample_data.py
@@ -80,20 +92,20 @@ python scripts/03_transform.py
 python scripts/04_generate_reports.py
 ```
 
-## 4. What gets produced
+## 4. What comes out of it
 
 | File | What it's for |
 |---|---|
 | `data/staging/validated_orders.csv` | Cleaned dataset after quality checks |
-| `data/processed/warehouse.db` | SQLite warehouse: `dim_customer`, `dim_product`, `dim_date`, `fact_orders`, plus reporting views |
-| `reports/quality_score_summary.csv` | Before/after data quality score, % rows with issues, duplicates removed |
+| `data/processed/warehouse.db` | SQLite warehouse — `dim_customer`, `dim_product`, `dim_date`, `fact_orders`, plus views |
+| `reports/quality_score_summary.csv` | Before/after quality score, % rows with issues, duplicates removed |
 | `reports/data_quality_report.csv` | Per-column null counts before/after cleaning |
 | `reports/monthly_revenue.csv`, `category_performance.csv`, `region_performance.csv`, `top_customers.csv` | Business reporting tables |
 | `reports/anomalies_amount_mismatch.csv`, `anomalies_high_value_orders.csv` | Anomaly detection outputs |
-| `metadata/lineage_log.json` / `reports/lineage_log_flat.csv` | Full data lineage history (every stage, every run) |
-| `metadata/data_dictionary.csv` | Governance catalog: column descriptions, source stage, transformation applied, PII flag |
+| `metadata/lineage_log.json` / `reports/lineage_log_flat.csv` | Full lineage history across every run |
+| `metadata/data_dictionary.csv` | Column descriptions, source stage, transformation applied, PII flag |
 
-## 5. Inspect the SQL warehouse directly 
+## 5. Poking around the warehouse directly
 
 ```bash
 sqlite3 data/processed/warehouse.db
@@ -102,49 +114,44 @@ SELECT * FROM vw_category_performance;
 .quit
 ```
 
-Or open `data/processed/warehouse.db` with DB Browser for SQLite (free, GUI)
-if you'd rather click around than write queries.
+Or just open `data/processed/warehouse.db` in DB Browser for SQLite if you'd
+rather click around than type queries.
 
 ## 6. Building the Power BI dashboard
 
-1. Open Power BI Desktop → **Get Data → Text/CSV**, then load each file from
-   `reports/` (or use **Get Data → Folder** and point it at the whole
-   `reports/` folder to load them all at once).
-2. visuals:
-   - **Line chart**: `monthly_revenue.csv` → `order_month` (x-axis) vs
-     `total_revenue` (y-axis), split by `order_year`.
-   - **Bar chart**: `category_performance.csv` → `product_category` vs
-     `revenue`.
-   - **Map or bar chart**: `region_performance.csv` → `region` vs `revenue`.
-   - **Table**: `top_customers.csv` for a top-10 customers leaderboard.
-   - **KPI cards**: pull `quality_score_before`, `quality_score_after`, and
-     `pct_rows_with_any_issue_before` from `quality_score_summary.csv` to
-     show the data-quality improvement front and center.
-   - **Table with conditional formatting**: `anomalies_high_value_orders.csv`
-     to flag outlier orders for review.
-3. If you re-run `main.py` after loading into Power BI, just hit **Refresh**
-   in Power BI — the file paths don't change, only their contents.
+1. Power BI Desktop → **Get Data → Text/CSV**, load files from `reports/`
+   one at a time (or **Get Data → Folder** to grab them all at once).
+2. What I used for visuals:
+   - Line chart — `monthly_revenue.csv`: `order_month` vs `total_revenue`,
+     split by `order_year`
+   - Bar chart — `category_performance.csv`: `product_category` vs `revenue`
+   - Bar/map — `region_performance.csv`: `region` vs `revenue`
+   - Table — `top_customers.csv`, top 10 leaderboard
+   - KPI cards — `quality_score_before`, `quality_score_after`,
+     `pct_rows_with_any_issue_before` from `quality_score_summary.csv`, to
+     show the quality improvement front and center
+   - Conditional-formatted table — `anomalies_high_value_orders.csv` to
+     flag outliers
+3. Re-running `main.py` after loading into Power BI just means hitting
+   **Refresh** — the file paths stay the same, only the contents change.
 
-## 7. How the "30% data quality improvement" number is produced
+## 7. Where the quality number comes from
 
-`02_validate.py` computes a composite quality score (completeness +
-uniqueness + validity, each 0–100%) both **before** any cleaning and
-**after**, plus a simpler row-level metric: the % of rows that had *at
-least one* problem (null, duplicate, invalid email, non-positive
-quantity/price, or unrecognized category). On the synthetic dataset this
-starts at roughly 10–11% of rows with an issue and drops to 0% after
-cleaning — express that as a relative improvement, or substitute your own
-dataset's real before/after numbers once you run it. The exact percentage
-will vary depending on how messy your input file is; that's expected and is
-exactly what the `quality_score_summary.csv` report is for — it recomputes
-automatically every run.
+`02_validate.py` computes a composite score (completeness + uniqueness +
+validity, each 0–100) before and after cleaning, plus a simpler metric: the
+% of rows with at least one problem (null, duplicate, invalid email,
+non-positive quantity/price, unrecognized category). On the synthetic
+dataset it starts around 10–11% of rows with an issue and drops to 0% after
+cleaning. The exact number moves depending on how messy the input file is —
+that's expected, and it's why `quality_score_summary.csv` recomputes on
+every run instead of being hardcoded.
 
-## 8. How lineage is tracked
+## 8. How lineage gets tracked
 
-`scripts/lineage_tracker.py` is a small logger every stage calls once it
-finishes: `source`, `target`, `rows_in`, `rows_out`, `columns`, a plain-English
-`transformation` description, and a shared `run_id` for that pipeline run.
-Records append to `metadata/lineage_log.json`, so you get a full audit trail
-across every run, not just the latest one — answer "where did this table
-come from, and what happened to it?" by reading that file or
-`reports/lineage_log_flat.csv`.
+`scripts/lineage_tracker.py` is a small logger that every stage calls once
+it's done — records `source`, `target`, `rows_in`, `rows_out`, `columns`
+touched, a plain-English description of the transformation, and a shared
+`run_id` for that run. It all appends to `metadata/lineage_log.json`, so you
+get a full history across every run, not just the last one. If you ever
+need to answer "where did this table come from and what happened to it,"
+that file (or `reports/lineage_log_flat.csv`) has the answer.
